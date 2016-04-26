@@ -3,6 +3,7 @@ package com.koushikdutta.async.http.socketio;
 import android.net.Uri;
 import android.text.TextUtils;
 
+import com.koushikdutta.async.AsyncServer;
 import com.koushikdutta.async.callback.CompletedCallback;
 import com.koushikdutta.async.future.Cancellable;
 import com.koushikdutta.async.future.DependentCancellable;
@@ -169,19 +170,33 @@ class SocketIOConnection {
             child.setParent(connecting);
     }
 
-    void setupHeartbeat() {
-        final SocketIOTransport ts = transport;
-        Runnable heartbeatRunner = new Runnable() {
-            @Override
-            public void run() {
-                if (heartbeat <= 0 || ts != transport || ts == null || !ts.isConnected())
-                    return;
-                transport.send("2:::");
-                transport.getServer().postDelayed(this, heartbeat);
+    private class HeartbeatRunner implements Runnable {
+        private SocketIOTransport mTransport;
+        HeartbeatRunner(SocketIOTransport t) {
+            mTransport = t;
+        }
+        @Override
+        public void run() {
+            // Make sure this HeartbeatRunner is still relevant.
+            if (heartbeat <= 0 || null == mTransport || mTransport != transport || !mTransport.isConnected()) {
+                return;
             }
-        };
+
+            mTransport.send("2:::");
+            AsyncServer server = mTransport.getServer();
+
+            if (null != server && mTransport == transport ) {
+                // Schedule next heartbeat
+                server.postDelayed(this, heartbeat);
+            }
+        }
+    }
+
+    void setupHeartbeat() {
+        Runnable heartbeatRunner = new HeartbeatRunner(transport);
         heartbeatRunner.run();
     }
+
 
     private interface SelectCallback {
         void onSelect(SocketIOClient client);
