@@ -1,4 +1,5 @@
 bin
+AndroidAsync/gradle.properties
 .settings
 local.properties
 gen
